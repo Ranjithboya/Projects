@@ -1,0 +1,37 @@
+[
+  {
+    "time": "2025-09-14T22:38:21.837437",
+    "type": "Q&A",
+    "text": "hi"
+  },
+  {
+    "time": "2025-09-14T22:38:21.837437",
+    "type": "A",
+    "text": "Hello! How can I assist you today?"
+  },
+  {
+    "time": "2025-09-14T22:38:32.883892",
+    "type": "Q&A",
+    "text": "sada"
+  },
+  {
+    "time": "2025-09-14T22:38:32.883892",
+    "type": "A",
+    "text": "Hi there! How can I assist you today?"
+  },
+  {
+    "time": "2025-09-14T22:38:39.857235",
+    "type": "Lead",
+    "text": "{\"name\": \"dfg\", \"email\": \"fdg@fsdf\", \"company\": \"43\", \"timestamp\": \"2025-09-14T22:38:39.857235\"}"
+  },
+  {
+    "time": "2025-09-14T22:38:48.247563",
+    "type": "Q&A",
+    "text": "dfg"
+  },
+  {
+    "time": "2025-09-14T22:38:48.247563",
+    "type": "A",
+    "text": "I'm sorry, I didn't quite catch that. Can you please provide more details or ask another question regarding our product or services?"
+  }
+]

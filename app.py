@@ -1,125 +1,163 @@
-# pip install streamlit openai python-dotenv pyyaml
-
+import os
+import json
 import streamlit as st
-import time, json, yaml
-from utils.model import build_prompt, generate_response
-from utils.faq_loader import load_faq
-from utils.config_loader import load_config
-from utils.lead_persistence import save_lead
-from utils.trace_logger import log_trace
+import time
+from datetime import datetime
+import openai
 
-# Hide Streamlit chrome
-st.markdown("""
+from openai import OpenAI
+
+client = OpenAI(api_key="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")
+
+import os
+import json
+import time
+import streamlit as st
+from datetime import datetime
+from openai import OpenAI
+
+# === CONFIG ===
+CONFIG_DIR = "config"
+os.makedirs(CONFIG_DIR, exist_ok=True)
+
+def load_json(path, default=[]):
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            content = f.read().strip()
+            return json.loads(content) if content else default
+    return default
+
+def save_json(path, data):
+    with open(path, "w") as f:
+        json.dump(data, f, indent=2)
+
+# Load configs
+faqs = load_json(f"{CONFIG_DIR}/faqs.json")
+bot_config = load_json(f"{CONFIG_DIR}/bot_config.json", default={"tone": "", "persona": ""})
+nudges = load_json(f"{CONFIG_DIR}/nudges.json")
+lead_fields = load_json(f"{CONFIG_DIR}/lead_fields.json")
+
+
+
+# === SESSION STATE ===
+st.session_state.setdefault("chat_log", [])
+st.session_state.setdefault("lead_info", {})
+st.session_state.setdefault("trace", [])
+st.session_state.setdefault("knowledge_pack", "")
+
+def save_trace_to_file(trace_data, filename="session_trace.json"):
+    with open(filename, "w") as f:
+        json.dump(trace_data, f, indent=2)
+
+def save_lead_to_file(lead_data, filename="leads.json"):
+    if os.path.exists(filename):
+        with open(filename, "r") as f:
+            content = f.read().strip()
+            existing = json.loads(content) if content else []
+    else:
+        existing = []
+    existing.append(lead_data)
+    with open(filename, "w") as f:
+        json.dump(existing, f, indent=2)
+
+# === HIDE STREAMLIT UI ELEMENTS ===
+hide_streamlit_style = """
     <style>
-    #MainMenu, header, footer {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
     </style>
-""", unsafe_allow_html=True)
+"""
+st.markdown(hide_streamlit_style, unsafe_allow_html=True)
 
-st.sidebar.header("🔧 Configuration")
+# === SIDEBAR ===
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/4712/4712107.png", width=60)
+st.sidebar.markdown("### 🤖 Sales Assistant Bot")
 
-# 1️⃣ Optional upload: FAQ pack
-uploaded_faq = st.sidebar.file_uploader("Upload FAQ JSON", type="json")
-if uploaded_faq:
-    try:
-        faq_data = json.load(uploaded_faq)
-        st.sidebar.success("Loaded FAQ pack")
-    except Exception as e:
-        st.sidebar.error(f"Invalid JSON: {e}")
-else:
-    faq_data = load_faq("data/faq_knowledge.json")
+# === KNOWLEDGE PACK UPLOAD IN SIDEBAR ===
+st.sidebar.markdown("#### 📦 Upload Knowledge Pack")
+uploaded_pack = st.sidebar.file_uploader("Upload a .txt or .md file", type=["txt", "md"], key="sidebar_knowledge_pack")
+if uploaded_pack:
+    st.session_state.knowledge_pack = uploaded_pack.getvalue().decode("utf-8")
+    st.sidebar.success("Knowledge pack uploaded successfully!")
 
-# 2️⃣ Optional upload: Bot config (lead fields, nudges, etc.)
-uploaded_cfg = st.sidebar.file_uploader("Upload config YAML", type=["yml", "yaml"])
-if uploaded_cfg:
-    try:
-        config = yaml.safe_load(uploaded_cfg)
-        st.sidebar.success("Loaded config")
-    except Exception as e:
-        st.sidebar.error(f"Invalid YAML: {e}")
-else:
-    config = load_config("config/bot_config.yaml")
+# === HEADER ===
+st.title("💬 Sales Page Quick-Answer & Lead Bot")
 
-# Initialize session state
-session = st.session_state
-session.setdefault("chat_history", [])
-session.setdefault("questions_asked", 0)
-session.setdefault("show_lead_form", False)
-session.setdefault("start_time", time.time())
-session.setdefault("intent_shown", False)
-session.setdefault("chat_enabled", False)
+# === SITUATION PREVIEW ===
+st.subheader("🧪 Situation → Bot Would Say...")
+situation = st.text_input("Describe a visitor’s situation")
+if st.button("Preview Response"):
+    context = "\n".join([f"{faq['question']}: {faq['answer']}" for faq in faqs])
+    full_context = context + "\n\n" + st.session_state.knowledge_pack
+    preview_prompt = f"{full_context}\n\nSituation: {situation}\nBot:"
+    preview_response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": bot_config["persona"]},
+            {"role": "user", "content": preview_prompt}
+        ]
+    )
+    preview_text = preview_response.choices[0].message.content.strip()
+    st.markdown(f"**Bot would say:**\n\n{preview_text}")
 
-# App title
-st.title("SalesbotAI 🤖 — Quick-Answer & Lead Capture")
+# === CHAT HISTORY ===
+st.subheader("Live Q&A Chat")
+for q, a, ts in st.session_state.chat_log:
+    with st.chat_message("user"):
+        st.markdown(q)
+    with st.chat_message("assistant"):
+        st.markdown(a)
 
-# 🚩 Right-moment nudge: linger
-elapsed = time.time() - session.start_time
-if elapsed > config["nudges"]["linger_seconds"] and not session.intent_shown:
-    st.info(config["nudges"]["linger_message"])
-    session.intent_shown = True
+# === NEW QUESTION ===
+question = st.chat_input("Ask me anything...")
 
-# 💬 Reveal chat on intent
-if session.intent_shown and not session.chat_enabled:
-    if st.button(config["nudges"]["trigger_button_label"]):
-        session.chat_enabled = True
+if question:
+    with st.chat_message("user"):
+        st.markdown(question)
 
-# ——— CHAT WIDGET ———
-if session.chat_enabled:
-    user_q = st.chat_input("Ask your question…")
-    if user_q:
-        prompts = build_prompt(
-            session.chat_history,
-            user_q,
-            faq_data=faq_data,
-            page_context=session.get("current_page", None)
-        )
-        answer = generate_response(prompts)
-        time.sleep(config["bot"]["response_delay"])  # natural pacing
+    context = "\n".join([f"{faq['question']}: {faq['answer']}" for faq in faqs])
+    full_context = context + "\n\n" + st.session_state.knowledge_pack
+    prompt = f"{full_context}\n\nUser: {question}\nBot:"
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": bot_config["persona"]},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    answer = response.choices[0].message.content.strip()
 
-        # Update history & trace
-        session.chat_history.append({"user": user_q, "bot": answer})
-        session.questions_asked += 1
-        log_trace(user_q, answer)
+    with st.chat_message("assistant"):
+        with st.spinner("Bot is typing..."):
+            time.sleep(1.5)
+            st.markdown(answer)
 
-        # Lead form after threshold
-        if session.questions_asked >= config["lead"]["threshold"]:
-            session.show_lead_form = True
+    timestamp = datetime.now().isoformat()
+    st.session_state.chat_log.append((question, answer, timestamp))
+    st.session_state.trace.append({"time": timestamp, "type": "Q&A", "text": question})
+    st.session_state.trace.append({"time": timestamp, "type": "A", "text": answer})
+    save_trace_to_file(st.session_state.trace)
 
-    # Render chat history
-    for turn in session.chat_history:
-        st.markdown(f"**You:** {turn['user']}")
-        st.markdown(f"**Bot:** {turn['bot']}")
+    # Optional: nudge after 2 questions
+    for nudge in nudges:
+        if nudge["trigger"] == "2_questions" and len(st.session_state.chat_log) == 2:
+            with st.chat_message("assistant"):
+                st.markdown(f"💡 {nudge['message']}")
 
-# ——— LEAD CAPTURE ———
-if session.show_lead_form:
-    st.info(config["lead"]["prompt"])
+# === LEAD CAPTURE ===
+if len(st.session_state.chat_log) >= 2 and not st.session_state.lead_info:
+    st.subheader("📇 Interested? Get a quick quote")
     with st.form("lead_form"):
-        lead = {}
-        for field in config["lead"]["fields"]:
-            fld = config["lead"]["fields"][field]
-            if fld["type"] == "text":
-                lead[field] = st.text_input(fld["label"])
-            elif fld["type"] == "select":
-                lead[field] = st.selectbox(
-                    fld["label"],
-                    options=fld["options"],
-                    index=fld.get("default_index", 0)
-                )
-        if st.form_submit_button("Submit"):
-            save_lead(lead)
-            st.success("Thanks! We’ll be in touch soon.")
-
-# ——— MESSAGE REVIEW TOOL ———
-with st.expander("📋 Situation → Bot Preview"):
-    page = st.selectbox("Simulate Page", config["pages"])
-    question = st.text_input("Sample visitor question")
-    if question:
-        preview_ctx = build_prompt([], question, faq_data=faq_data, page_context=page)
-        preview_ans = generate_response(preview_ctx)
-        st.markdown(f"**Bot would say:** {preview_ans}")
-
-# ——— RESET ———
-if st.button("🔄 Clear all"):
-    for key in ["chat_history", "questions_asked", "show_lead_form",
-                "start_time", "intent_shown", "chat_enabled"]:
-        session[key] = [] if isinstance(session[key], list) else False
-    session.start_time = time.time()
+        lead_data = {}
+        for field in lead_fields:
+            value = st.text_input(field["label"])
+            lead_data[field["key"]] = value
+        submitted = st.form_submit_button("Submit")
+        if submitted:
+            lead_data["timestamp"] = datetime.now().isoformat()
+            st.session_state.lead_info = lead_data
+            st.session_state.trace.append({"time": lead_data["timestamp"], "type": "Lead", "text": json.dumps(lead_data)})
+            save_trace_to_file(st.session_state.trace)
+            save_lead_to_file(lead_data)
+            st.success("Thanks! We'll be in touch soon.")
