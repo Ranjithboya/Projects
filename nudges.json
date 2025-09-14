@@ -1,0 +1,4 @@
+[
+  { "trigger": "2_questions", "message": "Want a quick quote?" },
+  { "trigger": "idle_30s", "message": "Still thinking? I can help!" }
+]

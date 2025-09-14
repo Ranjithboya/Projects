@@ -1,0 +1,5 @@
+[
+  { "label": "Your Name", "key": "name", "type": "text" },
+  { "label": "Work Email", "key": "email", "type": "email" },
+  { "label": "Company Size", "key": "company", "type": "text" }
+]

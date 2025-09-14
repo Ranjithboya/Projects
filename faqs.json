@@ -1,0 +1,17 @@
+[
+  { "question": "What is the price?", "answer": "Our pricing starts at $10/user/month." },
+  { "question": "Do you support SOC 2?", "answer": "Yes, we're SOC 2 Type II compliant." },
+  { "question": "Do you offer volume discounts?", "answer": "Yes, we provide tiered discounts for teams over 50 users." },
+  { "question": "Is there a free trial?", "answer": "We offer a 14-day free trial with full feature access." },
+  { "question": "Can I switch plans anytime?", "answer": "Absolutely. You can upgrade or downgrade your plan at any time." },
+  { "question": "Do you offer custom enterprise pricing?", "answer": "Yes, our sales team can tailor a quote based on your needs." },
+  { "question": "Is data encrypted?", "answer": "All data is encrypted at rest and in transit using AES-256." },
+  { "question": "Do you support data residency in India?", "answer": "Yes, we offer data residency options in India, EU, and US." },
+  { "question": "Do you conduct regular security audits?", "answer": "We perform annual third-party penetration tests and internal audits." },
+  { "question": "What authentication methods are supported?", "answer": "We support SSO, OAuth 2.0, and API key-based authentication." },
+  { "question": "Do you integrate with Salesforce?", "answer": "Yes, we offer native integration with Salesforce, HubSpot, and Slack." },
+  { "question": "Is there an API available?", "answer": "Yes, we provide a RESTful API with detailed documentation." },
+  { "question": "Are webhooks supported?", "answer": "Yes, you can configure custom webhooks for real-time event delivery." },
+  { "question": "Can I monitor API usage?", "answer": "You can track API usage and set limits via the dashboard." },
+  { "question": "Do you charge for API calls?", "answer": "API usage is included up to a monthly threshold, with overage fees beyond that." }
+]
